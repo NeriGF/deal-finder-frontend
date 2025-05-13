@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deal Finder</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      padding: 2rem;
+      text-align: center;
+    }
+    h1 {
+      color: #222;
+    }
+    form {
+      margin-bottom: 2rem;
+    }
+    input {
+      padding: 0.5rem;
+      font-size: 1rem;
+      width: 300px;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      margin-left: 0.5rem;
+    }
+    .results {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-width: 600px;
+      margin: auto;
+      text-align: left;
+    }
+    .deal {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 1rem;
+      border-radius: 8px;
+    }
+    .deal a {
+      font-weight: bold;
+      color: #0070f3;
+    }
+  </style>
+</head>
+<body>
+  <h1>Find Best Amazon Deals</h1>
+  <form id="deal-form">
+    <input type="text" id="query" placeholder="Search for a product..." required />
+    <button type="submit">Find Deals</button>
+  </form>
+  <div class="results" id="results"></div>
+
+  <script>
+    const endpoint = "https://deal-finder-mcp.mydeals-ai.workers.dev";
+    const userKey = "cus_SIgjQLDNFpPIQn"; // Replace dynamically if Stripe login added
+
+    document.getElementById('deal-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const query = document.getElementById('query').value.trim();
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = 'Searching...';
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool: 'find_best_deals',
+          parameters: {
+            query,
+            userKey,
+            site: 'amazon'
+          }
+        })
+      });
+
+      const json = await res.json();
+      if (json.error) {
+        resultsDiv.innerHTML = `<p style="color:red">${json.error}</p>`;
+        return;
+      }
+
+      resultsDiv.innerHTML = '';
+      json.deals.forEach(deal => {
+        const el = document.createElement('div');
+        el.className = 'deal';
+        el.innerHTML = `
+          <a href="${deal.url}" target="_blank">${deal.title}</a><br />
+          <strong>${deal.price}</strong>
+        `;
+        resultsDiv.appendChild(el);
+      });
+    });
+  </script>
+</body>
+</html>
