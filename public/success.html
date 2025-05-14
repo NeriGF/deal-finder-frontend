@@ -9,36 +9,47 @@
       padding: 2rem;
       text-align: center;
     }
+    #details {
+      margin-top: 1rem;
+    }
   </style>
 </head>
 <body>
-  <h1>🎉 Payment Successful!</h1>
-  <p id="status">Retrieving your Stripe customer ID...</p>
+  <h1>🎉 You're Subscribed!</h1>
+  <p id="status">Retrieving your subscription info...</p>
+  <div id="details"></div>
 
   <script>
     const status = document.getElementById("status");
+    const details = document.getElementById("details");
     const url = new URL(window.location.href);
     const sessionId = url.searchParams.get("session_id");
 
-    if (sessionId) {
-      fetch(`/api/get-stripe-customer?session_id=${sessionId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.customer) {
-            status.innerHTML = `✅ Your Stripe Customer ID: <strong>${data.customer.id}</strong>`;
-            // Optional: save for later use
-            localStorage.setItem("stripe_customer_id", data.customer.id);
-          } else {
-            status.innerText = "⚠️ Could not retrieve customer information.";
-          }
-        })
-        .catch(err => {
-          console.error("Error:", err);
-          status.innerText = "⚠️ Error retrieving customer information.";
-        });
-    } else {
+    if (!sessionId) {
       status.innerText = "⚠️ No session_id found in URL.";
+    } else {
+      // Lookup session from your backend
+      fetch("/api/lookup-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.customerId && data.email) {
+          status.innerHTML = `✅ Thanks, <strong>${data.email}</strong>!`;
+          details.innerHTML = `Your Stripe Customer ID is <strong>${data.customerId}</strong>`;
+          localStorage.setItem("stripe_customer_id", data.customerId); // Store it for later
+        } else {
+          status.innerText = "⚠️ Could not verify your subscription.";
+        }
+      })
+      .catch((err) => {
+        console.error("❌ Lookup failed:", err);
+        status.innerText = "⚠️ Error retrieving your subscription info.";
+      });
     }
   </script>
 </body>
 </html>
+
