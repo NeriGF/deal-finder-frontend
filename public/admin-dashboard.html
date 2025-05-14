@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    .customer { margin-bottom: 1rem; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>📊 Admin Dashboard</h1>
+  <div id="customers">Loading customers...</div>
+
+  <script>
+    const token = localStorage.getItem("admin_token");
+    if (token !== "admin-ok") {
+      alert("Not authorized");
+      window.location.href = "/admin.html";
+    }
+
+    // future: fetch customer list here and render
+  </script>
+</body>
+</html>
