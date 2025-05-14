@@ -15,31 +15,25 @@ module.exports = async (req, res) => {
   }
 
   const { email } = req.body;
+  console.log("📨 Incoming body:", req.body);
 
   if (!email) {
     return res.status(400).json({ error: "Missing email in request body" });
   }
 
-  console.log("📨 Incoming request body:", req.body);
-
-try {
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    customer_email: email,
-    line_items: [
-      {
-        price: "price_1RNRw6RVExZCuSNIoVn3EBjv",
-        quantity: 1,
-      },
-    ],
-    success_url: "https://deal-finder-frontend.vercel.app/success.html?session_id={CHECKOUT_SESSION_ID}",
-    cancel_url: "https://deal-finder-frontend.vercel.app/?canceled=true",
-  });
-
-  console.log("✅ Stripe session created:", session.id);
-  return res.status(200).json({ sessionId: session.id });
-}
-
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer_email: email,
+      line_items: [
+        {
+          price: "price_1RNRw6RVExZCuSNIoVn3EBjv",
+          quantity: 1,
+        },
+      ],
+      success_url: "https://deal-finder-frontend.vercel.app/success.html?session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: "https://deal-finder-frontend.vercel.app/?canceled=true",
+    });
 
     console.log("✅ Created session:", session.id);
     return res.status(200).json({ sessionId: session.id });
