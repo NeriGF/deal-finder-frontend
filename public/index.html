@@ -50,6 +50,8 @@
   <div id="results" style="margin-top: 2rem;">Search something to see results!</div>
 
   <script>
+        // 🧠 Prefill Stripe customer ID from localStorage
+    document.getElementById("userKey").value = localStorage.getItem("stripe_customer_id") || "";
     const MCP_ENDPOINT = "https://deal-finder-mcp.mydeals-ai.workers.dev";
     const STRIPE_PUBLISHABLE_KEY = "pk_test_51RNRl1RVExZCuSNIGyxt2rC4YlAb1wi0MJspulbkYfT6zpqCXnpF2jOhkM0tjFQo1QtmHcbJqwExUsbkDG6c6o1i00rvJJEqBZ" // 🔁 Replace with your real publishable key
     let stripe;
@@ -106,50 +108,63 @@ if (!sessionId) throw new Error("No sessionId returned from backend");
 
 
 
-    async function searchDeals() {
-      const query = document.getElementById("searchInput").value;
-      const userKey = document.getElementById("userKey").value;
-      const resultsDiv = document.getElementById("results");
+async function searchDeals() {
+  const query = document.getElementById("searchInput").value;
+  const userKey = document.getElementById("userKey").value;
+  const resultsDiv = document.getElementById("results");
 
-      if (!userKey.startsWith("cus_")) {
-        resultsDiv.innerHTML = "⚠️ Enter a valid Stripe customer ID.";
-        return;
-      }
+  // 🛡️ Validate userKey BEFORE proceeding
+  const isValid = await fetch("/api/validate-customer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userKey })
+  }).then(res => res.json());
 
-      resultsDiv.innerHTML = "🔎 Searching...";
+  if (!isValid.valid) {
+    resultsDiv.innerHTML = `⚠️ Access denied: ${isValid.error || "You need a subscription to use this tool."}`;
+    return;
+  }
 
-      try {
-        const response = await fetch(MCP_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tool: "find_best_deals",
-            parameters: {
-              query,
-              userKey,
-              site: "amazon"
-            }
-          })
-        });
+  if (!userKey.startsWith("cus_")) {
+    resultsDiv.innerHTML = "⚠️ Enter a valid Stripe customer ID.";
+    return;
+  }
 
-        const data = await response.json();
-        console.log("✅ Deals:", data);
-
-        if (data.deals && data.deals.length > 0) {
-          resultsDiv.innerHTML = data.deals.map(deal => `
-            <div class="deal">
-              <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a><br />
-              <span>${deal.price}</span>
-            </div>
-          `).join('');
-        } else {
-          resultsDiv.innerHTML = "No deals found.";
+  resultsDiv.innerHTML = "🔎 Searching...";
+  
+  try {
+    const response = await fetch(MCP_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tool: "find_best_deals",
+        parameters: {
+          query,
+          userKey,
+          site: "amazon"
         }
-      } catch (err) {
-        console.error("❌ Error fetching deals:", err);
-        resultsDiv.innerHTML = "Something went wrong.";
-      }
+      })
+    });
+
+    const data = await response.json();
+    console.log("✅ Deals:", data);
+
+    if (data.deals && data.deals.length > 0) {
+      resultsDiv.innerHTML = data.deals.map(deal => `
+        <div class="deal">
+          <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a><br />
+          <span>${deal.price}</span>
+        </div>
+      `).join('');
+    } else {
+      resultsDiv.innerHTML = "No deals found.";
     }
+  } catch (err) {
+    console.error("❌ Error fetching deals:", err);
+    resultsDiv.innerHTML = "Something went wrong.";
+  }
+}
+
   </script>
 </body>
 </html>
