@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: "https://deal-finder-frontend.vercel.app/success?session_id={CHECKOUT_SESSION_ID}",
+      success_url: "https://deal-finder-frontend.vercel.app/success.html?session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://deal-finder-frontend.vercel.app/?canceled=true",
     });
 
