@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ sessionId: session.id });
   } catch (err) {
-    console.error('❌ Stripe server error:', err.message);
+    console.error('❌ Stripe server error:', err);
     return res.status(500).json({ error: 'Server error creating Stripe session' });
   }
 }
