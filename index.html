@@ -66,7 +66,7 @@
 
     async function startCheckout() {
       await initStripe();
-      const res = await fetch("https://deal-finder-mcp.mydeals-ai.workers.dev", {
+      const res = await fetch("/api/create-checkout-session", {
         method: "POST",
       });
       const { sessionId } = await res.json();
