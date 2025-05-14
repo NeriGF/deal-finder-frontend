@@ -65,13 +65,30 @@
     }
 
     async function startCheckout() {
-      await initStripe();
-      const res = await fetch("/api/create-checkout-session", {
-        method: "POST",
-      });
-      const { sessionId } = await res.json();
-      await stripe.redirectToCheckout({ sessionId });
+  await initStripe();
+
+  try {
+    const res = await fetch("/api/create-checkout-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}) // important: always send valid JSON body
+    });
+
+    const contentType = res.headers.get("Content-Type") || "";
+    if (!contentType.includes("application/json")) {
+      const text = await res.text();
+      throw new Error("Non-JSON response: " + text);
     }
+
+    const { sessionId } = await res.json();
+    await stripe.redirectToCheckout({ sessionId });
+
+  } catch (err) {
+    console.error("❌ Checkout Error:", err);
+    alert("Stripe checkout failed: " + err.message);
+  }
+}
+
 
     async function searchDeals() {
       const query = document.getElementById("searchInput").value;
