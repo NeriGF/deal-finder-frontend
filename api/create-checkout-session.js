@@ -14,22 +14,28 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: "Only POST requests allowed" });
   }
 
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Missing email in request body" });
+  }
+
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
+      customer_email: email,
       line_items: [
         {
-          price: "price_1RNRw6RVExZCuSNIoVn3EBjv", // ✅ must be PRICE ID, not product
+          price: "price_1RNRw6RVExZCuSNIoVn3EBjv",
           quantity: 1,
         },
       ],
-      success_url: "https://deal-finder-frontend.vercel.app/?success=true",
+      success_url: "https://deal-finder-frontend.vercel.app/success?session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://deal-finder-frontend.vercel.app/?canceled=true",
     });
 
     console.log("✅ Created session:", session.id);
     return res.status(200).json({ sessionId: session.id });
-
   } catch (err) {
     console.error("❌ Stripe server error:", err.message);
     console.error(err); // Full details
