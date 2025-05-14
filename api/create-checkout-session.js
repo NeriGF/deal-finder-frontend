@@ -1,6 +1,6 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // ⛔ Don't hardcode secret key
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
       mode: 'subscription',
       line_items: [
         {
-          price: 'price_1RNRw6RVExZCuSNIoVn3EBjv', // ✅ Replace with YOUR Stripe Price ID
+          price: 'price_1RNRw6RVExZCuSNIoVn3EBjv',
           quantity: 1,
         },
       ],
@@ -23,4 +23,4 @@ module.exports = async (req, res) => {
     console.error('❌ Stripe server error:', err.message);
     return res.status(500).json({ error: 'Server error creating Stripe session' });
   }
-};
+}
