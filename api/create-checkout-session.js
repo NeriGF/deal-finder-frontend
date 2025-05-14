@@ -1,8 +1,8 @@
-const stripe = require('stripe')('sk_test_51RNRl1RVExZCuSNIFflHbkyPdlZFUtkHgWznXjEQBchEz1mmG5GOhn0pYCxZW7Tfq2soIKXIswtfnzTgPrcCK7FU0061si9r4R'); // 🔁 Replace with your **SECRET** Stripe key
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // ⛔ Don't hardcode secret key
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
-    return res.status(405).send({ error: 'Only POST allowed' });
+    return res.status(405).json({ error: 'Only POST allowed' });
   }
 
   try {
@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
       mode: 'subscription',
       line_items: [
         {
-          price: 'price_1RNRw6RVExZCuSNIoVn3EBjv', // 🔁 Replace with a real Stripe Price ID from your dashboard
+          price: 'price_1RNRw6RVExZCuSNIoVn3EBjv', // ✅ Replace with YOUR Stripe Price ID
           quantity: 1,
         },
       ],
@@ -18,9 +18,9 @@ module.exports = async (req, res) => {
       cancel_url: 'https://deal-finder-frontend.vercel.app/?canceled=true',
     });
 
-    res.status(200).json({ sessionId: session.id });
+    return res.status(200).json({ sessionId: session.id });
   } catch (err) {
-    console.error('❌ Stripe error:', err);
-    res.status(500).json({ error: 'Server error creating Stripe session' });
+    console.error('❌ Stripe server error:', err.message);
+    return res.status(500).json({ error: 'Server error creating Stripe session' });
   }
 };
