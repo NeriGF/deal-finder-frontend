@@ -75,21 +75,26 @@
 
   try {
     const res = await fetch("/api/create-checkout-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email }),
+});
 
-    const contentType = res.headers.get("Content-Type") || "";
-    if (!contentType.includes("application/json")) {
-      const text = await res.text();
-      throw new Error("Non-JSON response: " + text);
-    }
+console.log("🔁 Raw response status:", res.status);
 
-    const { sessionId } = await res.json();
-    console.log("🎯 Received sessionId:", sessionId);
+const contentType = res.headers.get("Content-Type") || "";
+if (!contentType.includes("application/json")) {
+  const text = await res.text();
+  console.error("🚨 Non-JSON response body:", text);
+  throw new Error("Non-JSON response: " + text);
+}
 
-    if (!sessionId) throw new Error("No sessionId returned from backend");
+const json = await res.json();
+console.log("📦 JSON body:", json);
+
+const { sessionId } = json;
+if (!sessionId) throw new Error("No sessionId returned from backend");
+
 
     await stripe.redirectToCheckout({ sessionId });
 
