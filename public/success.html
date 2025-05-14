@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Success 🎉</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎉 Payment Successful!</h1>
+  <p id="status">Retrieving your Stripe customer ID...</p>
+
+  <script>
+    const status = document.getElementById("status");
+    const url = new URL(window.location.href);
+    const sessionId = url.searchParams.get("session_id");
+
+    if (sessionId) {
+      fetch(`/api/get-stripe-customer?session_id=${sessionId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.customer) {
+            status.innerHTML = `✅ Your Stripe Customer ID: <strong>${data.customer.id}</strong>`;
+            // Optional: save for later use
+            localStorage.setItem("stripe_customer_id", data.customer.id);
+          } else {
+            status.innerText = "⚠️ Could not retrieve customer information.";
+          }
+        })
+        .catch(err => {
+          console.error("Error:", err);
+          status.innerText = "⚠️ Error retrieving customer information.";
+        });
+    } else {
+      status.innerText = "⚠️ No session_id found in URL.";
+    }
+  </script>
+</body>
+</html>
