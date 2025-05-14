@@ -164,6 +164,13 @@ async function searchDeals() {
     resultsDiv.innerHTML = "Something went wrong.";
   }
 }
+// Autofill saved customer ID if available
+document.addEventListener("DOMContentLoaded", () => {
+  const savedId = localStorage.getItem("stripe_customer_id");
+  if (savedId) {
+    document.getElementById("userKey").value = savedId;
+  }
+});
 
   </script>
 </body>
