@@ -1,5 +1,3 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
 module.exports = async (req, res) => {
   console.log("▶️ Stripe session creation started");
 
@@ -9,6 +7,8 @@ module.exports = async (req, res) => {
   if (!stripeSecretKey) {
     return res.status(500).json({ error: "Missing Stripe secret key in env vars" });
   }
+
+  const stripe = require('stripe')(stripeSecretKey); // ✅ MOVE INSIDE FUNCTION
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST requests allowed" });
@@ -36,6 +36,7 @@ module.exports = async (req, res) => {
 
     console.log("✅ Created session:", session.id);
     return res.status(200).json({ sessionId: session.id });
+
   } catch (err) {
     console.error("❌ Stripe server error:", err.message);
     console.error(err); // Full details
