@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
       mode: 'subscription',
       line_items: [
         {
-          price: 'cus_SIgjQLDNFpPIQn', // 🔁 Replace with a real Stripe Price ID from your dashboard
+          price: 'price_1RNRw6RVExZCuSNIoVn3EBjv', // 🔁 Replace with a real Stripe Price ID from your dashboard
           quantity: 1,
         },
       ],
