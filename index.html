@@ -3,98 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Deal Finder</title>
+  <title>Find Best Amazon Deals</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f8f9fa;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       padding: 2rem;
-      text-align: center;
-    }
-    h1 {
-      color: #222;
-    }
-    form {
-      margin-bottom: 2rem;
+      background: #f9f9f9;
     }
     input {
       padding: 0.5rem;
-      font-size: 1rem;
       width: 300px;
+      margin-right: 10px;
     }
     button {
       padding: 0.5rem 1rem;
-      font-size: 1rem;
-      margin-left: 0.5rem;
-    }
-    .results {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      max-width: 600px;
-      margin: auto;
-      text-align: left;
     }
     .deal {
       background: #fff;
       border: 1px solid #ccc;
-      padding: 1rem;
       border-radius: 8px;
-    }
-    .deal a {
-      font-weight: bold;
-      color: #0070f3;
+      padding: 1rem;
+      margin-top: 1rem;
+      width: 90%;
+      max-width: 600px;
     }
   </style>
 </head>
 <body>
   <h1>Find Best Amazon Deals</h1>
-  <form id="deal-form">
-    <input type="text" id="query" placeholder="Search for a product..." required />
-    <button type="submit">Find Deals</button>
-  </form>
-  <div class="results" id="results"></div>
+  <div>
+    <input type="text" id="searchInput" placeholder="e.g. noise cancelling headphones" />
+    <button onclick="searchDeals()">Find Deals</button>
+  </div>
+  <div id="results" style="margin-top: 2rem;">Search something to see results!</div>
 
   <script>
-    const endpoint = "https://deal-finder-mcp.mydeals-ai.workers.dev";
-    const userKey = "cus_SIgjQLDNFpPIQn"; // Replace dynamically if Stripe login added
+    async function searchDeals() {
+      const query = document.getElementById("searchInput").value;
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "Searching...";
 
-    document.getElementById('deal-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const query = document.getElementById('query').value.trim();
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = 'Searching...';
+      try {
+        const response = await fetch("https://deal-finder-mcp.mydeals-ai.workers.dev", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tool: "find_best_deals",
+            parameters: {
+              query: query,
+              userKey: "cus_SIgjQLDNFpPIQn",
+              site: "amazon"
+            }
+          })
+        });
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tool: 'find_best_deals',
-          parameters: {
-            query,
-            userKey,
-            site: 'amazon'
-          }
-        })
-      });
+        const data = await response.json();
+        console.log("✅ Deals:", data);
 
-      const json = await res.json();
-      if (json.error) {
-        resultsDiv.innerHTML = `<p style="color:red">${json.error}</p>`;
-        return;
+        if (data.deals && data.deals.length > 0) {
+          resultsDiv.innerHTML = data.deals.map(deal => `
+            <div class="deal">
+              <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a><br />
+              <span>${deal.price}</span>
+            </div>
+          `).join('');
+        } else {
+          resultsDiv.innerHTML = "No deals found.";
+        }
+      } catch (err) {
+        console.error("❌ Error fetching deals:", err);
+        resultsDiv.innerHTML = "Something went wrong.";
       }
-
-      resultsDiv.innerHTML = '';
-      json.deals.forEach(deal => {
-        const el = document.createElement('div');
-        el.className = 'deal';
-        el.innerHTML = `
-          <a href="${deal.url}" target="_blank">${deal.title}</a><br />
-          <strong>${deal.price}</strong>
-        `;
-        resultsDiv.appendChild(el);
-      });
-    });
+    }
   </script>
 </body>
 </html>
