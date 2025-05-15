@@ -6,8 +6,7 @@ export default async function handler(req, res) {
   const { customerId } = req.body;
   const auth = req.headers.authorization;
 
-  // 🧠 Debug log to Vercel’s console
-  console.log("🔍 Forwarding request with:");
+  console.log("🧪 Forwarding proxy-reset call with:");
   console.log("customerId:", customerId);
   console.log("Authorization:", auth);
 
