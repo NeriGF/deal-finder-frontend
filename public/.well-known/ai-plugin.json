@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Deal Finder",
+  "name_for_model": "deal_finder",
+  "description_for_human": "Find the best product deals from Amazon, eBay, Best Buy, and Walmart.",
+  "description_for_model": "Use this tool to search for the best deals across Amazon, eBay, Best Buy, and Walmart given a product query and an optional site.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://deal-finder-frontend.vercel.app/openapi.yaml"
+  },
+  "logo_url": "https://deal-finder-frontend.vercel.app/logo.png",
+  "contact_email": "support@mydeals-ai.com",
+  "legal_info_url": "https://deal-finder-frontend.vercel.app/legal"
+}
