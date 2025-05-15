@@ -44,7 +44,7 @@
     });
   // ✅ Reset usage function
   function resetUsage(customerId) {
-  fetch("https://deal-finder-mcp.mydeals-ai.workers.dev/api/reset-usage", {
+  fetch("/api/proxy-reset", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
