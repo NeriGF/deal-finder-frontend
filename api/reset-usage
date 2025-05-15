@@ -1,10 +1,10 @@
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+module.exports = async (req, env) => {
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  };
 
-module.exports = async (req, res) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
@@ -17,14 +17,26 @@ module.exports = async (req, res) => {
   }
 
   const token = req.headers.get("authorization");
-  if (token !== `Bearer ${process.env.ADMIN_PASSWORD}`) {
+  if (token !== `Bearer ${env.ADMIN_PASSWORD}`) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 403,
       headers: corsHeaders,
     });
   }
 
-  const { customerId } = await req.json();
+  let body;
+  try {
+    body = await req.json();
+    console.log("📦 Incoming JSON Body:", body);
+  } catch (err) {
+    console.error("❌ Failed to parse body:", err);
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+      status: 400,
+      headers: corsHeaders,
+    });
+  }
+
+  const { customerId } = body;
   if (!customerId || !customerId.startsWith("cus_")) {
     return new Response(JSON.stringify({ error: "Invalid customer ID" }), {
       status: 400,
