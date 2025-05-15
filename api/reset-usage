@@ -1,0 +1,8 @@
+// /api/reset-usage.js
+module.exports = async (req, res) => {
+  const { userKey } = await req.json();
+  const now = new Date();
+  const key = `${userKey}_${now.getFullYear()}-${now.getMonth() + 1}`;
+  await env.USAGE_KV.put(key, "0");
+  return new Response("✅ Usage reset", { status: 200 });
+};
