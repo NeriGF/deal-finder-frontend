@@ -41,6 +41,25 @@
     .catch((err) => {
       console.error("Error loading dashboard:", err);
     });
+  // ✅ Reset usage function
+  function resetUsage(customerId) {
+  fetch("/api/reset-usage", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
+    },
+    body: JSON.stringify({ customerId }),
+  }).then((res) => {
+    if (res.ok) {
+      alert("Usage reset!");
+      location.reload();
+    } else {
+      alert("Failed to reset usage.");
+    }
+  });
+}
+
 </script>
 
 </body>
