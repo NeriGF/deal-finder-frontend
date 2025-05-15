@@ -25,16 +25,18 @@ module.exports = async (req, env) => {
   }
 
   let body;
-  try {
-    body = await req.json();
-    console.log("📦 Incoming JSON Body:", body);
-  } catch (err) {
-    console.error("❌ Failed to parse body:", err);
-    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-      status: 400,
-      headers: corsHeaders,
-    });
-  }
+try {
+  body = await req.json();
+  console.log("📦 Incoming JSON Body:", body);
+  console.log("🧪 Header Authorization:", token);
+} catch (err) {
+  console.error("❌ Failed to parse body:", err);
+  return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+    status: 400,
+    headers: corsHeaders,
+  });
+}
+
 
   const { customerId } = body;
   if (!customerId || !customerId.startsWith("cus_")) {
