@@ -13,14 +13,35 @@
   <h1>📊 Admin Dashboard</h1>
   <div id="customers">Loading customers...</div>
 
-  <script>
-    const token = localStorage.getItem("admin_token");
-    if (token !== "admin-ok") {
-      alert("Not authorized");
-      window.location.href = "/admin.html";
-    }
+  <ul id="customerList"></ul>
 
-    // future: fetch customer list here and render
-  </script>
+<script>
+  const token = localStorage.getItem("admin_token");
+
+  fetch("/api/list-customers", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      const list = document.getElementById("customerList");
+      if (!data.customers) {
+        list.innerHTML = "<li>❌ Failed to load customer data</li>";
+        return;
+      }
+
+      list.innerHTML = data.customers.map(cust => `
+        <li>
+          <strong>${cust.email}</strong> - ${cust.status}
+          ${cust.current_period_end ? ` (ends: ${new Date(cust.current_period_end * 1000).toLocaleDateString()})` : ""}
+        </li>
+      `).join("");
+    })
+    .catch((err) => {
+      console.error("Error loading dashboard:", err);
+    });
+</script>
+
 </body>
 </html>
