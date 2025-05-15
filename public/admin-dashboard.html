@@ -32,12 +32,13 @@
       }
 
       list.innerHTML = data.customers.map(cust => `
-        <li>
-          <strong>${cust.email}</strong> - ${cust.status}
-          ${cust.current_period_end ? ` (ends: ${new Date(cust.current_period_end * 1000).toLocaleDateString()})` : ""}
-        </li>
-      `).join("");
-    })
+  <li>
+    <strong>${cust.email}</strong> - ${cust.status}
+    ${cust.current_period_end ? ` (ends: ${new Date(cust.current_period_end * 1000).toLocaleDateString()})` : ""}
+    <button onclick="resetUsage('${cust.id}')">🔁 Reset Usage</button>
+  </li>
+`).join("");
+
     .catch((err) => {
       console.error("Error loading dashboard:", err);
     });
