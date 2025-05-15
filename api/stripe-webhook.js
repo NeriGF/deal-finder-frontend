@@ -28,13 +28,21 @@ module.exports = async (req, res) => {
     "invoice.payment_failed"
   ];
 
-  if (allowedEvents.includes(event.type)) {
-    const customerId = event.data.object.customer;
-    const monthKey = `${customerId}_${new Date().getFullYear()}-${new Date().getMonth() + 1}`;
-
-    console.log(`🚫 Revoking access for ${customerId}`);
-    await env.USAGE_KV.put(monthKey, "1001");
+ if (allowedEvents.includes(event.type)) {
+  const customerId = event?.data?.object?.customer;
+  
+  if (!customerId) {
+    console.error("❌ No customer ID found in event.");
+    return res.status(400).send("Missing customer ID.");
   }
+
+  const now = new Date();
+  const monthKey = `${customerId}_${now.getFullYear()}-${now.getMonth() + 1}`;
+
+  console.log(`⛔️ Revoking access for ${customerId}`);
+  await env.USAGE_KV.put(monthKey, "1001");
+}
+
 
   res.json({ received: true });
 };
