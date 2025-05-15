@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const { customerId } = req.body;
   const auth = req.headers.authorization;
 
-  console.log("🧪 Forwarding proxy-reset call with:");
+  console.log("🛠️ Forwarding proxy-reset call with:");
   console.log("customerId:", customerId);
   console.log("Authorization:", auth);
 
