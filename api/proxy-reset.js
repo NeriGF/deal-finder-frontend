@@ -3,7 +3,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Only POST allowed" });
   }
 
-  const body = await req.json(); // ✅ FIX
+  // ✅ Manual JSON parsing to support Edge functions or raw requests
+  const raw = await req.text();
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch (e) {
+    console.error("❌ Invalid JSON body:", raw);
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
+
   const { customerId } = body;
   const auth = req.headers.authorization;
 
