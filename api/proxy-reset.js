@@ -1,31 +1,35 @@
 export default async function handler(req, res) {
   try {
     if (req.method !== "POST") {
+      console.log("🚫 Method not POST:", req.method);
       return res.status(405).json({ error: "Only POST allowed" });
     }
 
-    // 🛠️ Manually parse raw body (required on Vercel)
+    console.log("🔍 Reading raw body...");
     const raw = await req.text();
+    console.log("📦 Raw body string:", raw);
+
     let body;
     try {
       body = JSON.parse(raw);
     } catch (err) {
-      console.error("❌ JSON parse error:", raw);
+      console.error("❌ JSON parse error:", err.message);
       return res.status(400).json({ error: "Invalid JSON" });
     }
 
     const { customerId } = body;
     const auth = req.headers.authorization;
 
-    // 🧪 Debug
-    console.log("🧾 proxy-reset called with:");
+    console.log("🧾 Parsed values:");
     console.log("customerId:", customerId);
     console.log("Authorization:", auth);
 
     if (!customerId || !auth) {
+      console.log("🚫 Missing values!");
       return res.status(400).json({ error: "Missing customerId or Authorization" });
     }
 
+    console.log("🚀 Sending to reset-usage...");
     const forwardRes = await fetch("https://deal-finder-mcp.mydeals-ai.workers.dev/api/reset-usage", {
       method: "POST",
       headers: {
@@ -35,11 +39,13 @@ export default async function handler(req, res) {
       body: JSON.stringify({ customerId }),
     });
 
-    const data = await forwardRes.text(); // 👈 Not .json() to avoid unexpected crashes
+    console.log("✅ Forwarded status:", forwardRes.status);
+    const data = await forwardRes.text();
+    console.log("📨 Response from worker:", data);
 
     res.status(forwardRes.status).send(data);
   } catch (err) {
-    console.error("❌ proxy-reset failed:", err);
-    return res.status(500).json({ error: "Proxy failed" });
+    console.error("💥 Proxy failed:", err);
+    res.status(500).json({ error: "Proxy failed", detail: err.message });
   }
 }
