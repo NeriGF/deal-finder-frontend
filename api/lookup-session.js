@@ -13,7 +13,7 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({
       customerId: session.customer,
-      email: customer.email,
+      email: session.customer_email
     });
   } catch (err) {
     console.error("Lookup session failed:", err.message);
