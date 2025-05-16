@@ -114,7 +114,7 @@ async function searchDeals() {
   const resultsDiv = document.getElementById("results");
 
   // 🛡️ Validate userKey BEFORE proceeding
-  const isValid = await fetch("/api/validate-customer", {
+  const isValid = await fetch(`${MCP_ENDPOINT}/api/validate-customer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userKey })
