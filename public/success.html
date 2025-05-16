@@ -22,33 +22,33 @@
   <script>
     const status = document.getElementById("status");
     const details = document.getElementById("details");
-    const url = new URL(window.location.href);
-    const sessionId = url.searchParams.get("session_id");
+const url = new URL(window.location.href);
+const sessionId = url.searchParams.get("session_id");
 
-    if (!sessionId) {
-      status.innerText = "⚠️ No session_id found in URL.";
+if (!sessionId) {
+  status.innerText = "⚠️ No session_id found in URL.";
+} else {
+  fetch("/api/lookup-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId })
+  })
+  .then((res) => res.json())
+  .then((data) => {
+    if (data.customerId && data.email) {
+      localStorage.setItem("stripe_customer_id", data.customerId); // ✅ Store it!
+      status.innerHTML = `✅ Thanks, <strong>${data.email}</strong>!`;
+      details.innerHTML = `Your Stripe Customer ID is <strong>${data.customerId}</strong>`;
     } else {
-      // Lookup session from your backend
-      fetch("/api/lookup-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.customerId && data.email) {
-          status.innerHTML = `✅ Thanks, <strong>${data.email}</strong>!`;
-          details.innerHTML = `Your Stripe Customer ID is <strong>${data.customerId}</strong>`;
-          localStorage.setItem("stripe_customer_id", data.customerId); // Store it for later
-        } else {
-          status.innerText = "⚠️ Could not verify your subscription.";
-        }
-      })
-      .catch((err) => {
-        console.error("❌ Lookup failed:", err);
-        status.innerText = "⚠️ Error retrieving your subscription info.";
-      });
+      status.innerText = "⚠️ Could not verify your subscription.";
     }
+  })
+  .catch((err) => {
+    status.innerText = "⚠️ Error retrieving your subscription info.";
+    console.error("❌ Lookup failed:", err);
+  });
+}
+
   </script>
 </body>
 </html>
