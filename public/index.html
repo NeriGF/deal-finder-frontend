@@ -169,7 +169,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const savedId = localStorage.getItem("stripe_customer_id");
 
   const userKeyInput = document.getElementById("userKey");
-  const loginBtn = document.getElementById("loginBtn");
+  const loginBtn = document.querySelector("button[onclick='startCheckout()']")
 
   if (savedId && userKeyInput) {
     userKeyInput.value = savedId;
