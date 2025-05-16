@@ -164,13 +164,30 @@ async function searchDeals() {
     resultsDiv.innerHTML = "Something went wrong.";
   }
 }
-// Autofill saved customer ID if available
+// ✅ Auto-fill and hide Customer ID input if already subscribed
 document.addEventListener("DOMContentLoaded", () => {
   const savedId = localStorage.getItem("stripe_customer_id");
-  if (savedId) {
-    document.getElementById("userKey").value = savedId;
+
+  const userKeyInput = document.getElementById("userKey");
+  const loginBtn = document.getElementById("loginBtn");
+
+  if (savedId && userKeyInput) {
+    userKeyInput.value = savedId;
+
+    // 🎯 Auto-hide the input + login button
+    userKeyInput.style.display = "none";
+    if (loginBtn) loginBtn.style.display = "none";
+
+    // ✅ Optional: Show confirmation banner
+    const banner = document.createElement("p");
+    banner.innerText = `🔓 You're already subscribed!`;
+    banner.style.marginTop = "1rem";
+    banner.style.fontWeight = "bold";
+    banner.style.color = "green";
+    userKeyInput.parentNode.insertBefore(banner, userKeyInput);
   }
 });
+
 
   </script>
 </body>
