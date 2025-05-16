@@ -2,13 +2,11 @@ module.exports = async (req, res) => {
   console.log("▶️ Stripe session creation started");
 
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-  console.log("🔒 Loaded STRIPE_SECRET_KEY?", stripeSecretKey ? "Yes" : "No");
-
   if (!stripeSecretKey) {
     return res.status(500).json({ error: "Missing Stripe secret key in env vars" });
   }
 
-  const stripe = require('stripe')(stripeSecretKey); // ✅ MOVE INSIDE FUNCTION
+  const stripe = require('stripe')(stripeSecretKey);
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST requests allowed" });
@@ -22,9 +20,13 @@ module.exports = async (req, res) => {
   }
 
   try {
+    // 🔁 Create or reuse Stripe customer
+    const customers = await stripe.customers.list({ email, limit: 1 });
+    const customer = customers.data[0] || await stripe.customers.create({ email });
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      customer_email: email,
+      customer: customer.id, // ✅ Persistent Stripe customer
       line_items: [
         {
           price: "price_1RNRw6RVExZCuSNIoVn3EBjv",
@@ -40,7 +42,6 @@ module.exports = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Stripe server error:", err.message);
-    console.error(err); // Full details
     return res.status(500).json({ error: "Server error creating Stripe session" });
   }
 };
