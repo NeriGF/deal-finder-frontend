@@ -113,12 +113,12 @@ async function searchDeals() {
   const userKey = document.getElementById("userKey").value;
   const resultsDiv = document.getElementById("results");
 
-  // 🛡️ Validate userKey BEFORE proceeding
-  const isValid = await fetch(`${MCP_ENDPOINT}/api/validate-customer`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userKey })
-  }).then(res => res.json());
+  // 🛡️ Validate userKey BEFORE proceeding (✅ fixed)
+const isValid = await fetch("/api/validate-customer", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ userKey })
+}).then(res => res.json());
 
   if (!isValid.valid) {
     resultsDiv.innerHTML = `⚠️ Access denied: ${isValid.error || "You need a subscription to use this tool."}`;
