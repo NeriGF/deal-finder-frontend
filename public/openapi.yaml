@@ -1,0 +1,56 @@
+openapi: 3.0.1
+info:
+  title: Deal Finder Tool
+  description: Search for deals on Amazon, Walmart, Best Buy, and eBay.
+  version: "1.0"
+servers:
+  - url: https://deal-finder-mcp.mydeals-ai.workers.dev
+paths:
+  /:
+    post:
+      operationId: find_best_deals
+      summary: Find best product deals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tool:
+                  type: string
+                  example: find_best_deals
+                parameters:
+                  type: object
+                  properties:
+                    query:
+                      type: string
+                      description: Product search query
+                      example: bluetooth headphones
+                    userKey:
+                      type: string
+                      description: Stripe customer ID
+                      example: cus_abc123
+                    site:
+                      type: string
+                      description: Retailer to search (e.g., amazon, walmart, ebay, bestbuy)
+                      example: amazon
+      responses:
+        "200":
+          description: A list of best product deals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deals:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                        price:
+                          type: string
+                        url:
+                          type: string
