@@ -1,9 +1,10 @@
+<!-- Updated public/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Find Best Amazon Deals</title>
+  <title>Find Best Deals</title>
   <style>
     body {
       font-family: sans-serif;
@@ -13,7 +14,7 @@
       padding: 2rem;
       background: #f9f9f9;
     }
-    input {
+    input, select {
       padding: 0.5rem;
       width: 300px;
       margin-bottom: 10px;
@@ -34,161 +35,88 @@
   </style>
 </head>
 <body>
-  <h1>🛒 Find Best Amazon Deals</h1>
+  <h1>🛒 Find Best Deals (Amazon + Target)</h1>
 
-  <!-- 🔐 Stripe Login Button -->
   <button onclick="startCheckout()" style="background: #00aa66; color: white;">Login to Unlock (Stripe)</button>
 
   <!-- 🧾 Stripe Customer ID Input -->
   <input type="text" id="userKey" placeholder="Paste your Stripe Customer ID here (cus_...)" required />
 
-  <!-- 🔍 Search -->
   <input type="text" id="searchInput" placeholder="e.g. noise cancelling headphones" />
+
+  <select id="siteSelect">
+    <option value="amazon">Amazon</option>
+    <option value="target">Target</option>
+  </select>
+
   <button onclick="searchDeals()">Find Deals</button>
 
-  <!-- 📦 Results -->
   <div id="results" style="margin-top: 2rem;">Search something to see results!</div>
 
   <script>
-        // 🧠 Prefill Stripe customer ID from localStorage
     document.getElementById("userKey").value = localStorage.getItem("stripe_customer_id") || "";
     const MCP_ENDPOINT = "https://deal-finder-mcp.mydeals-ai.workers.dev";
-    const STRIPE_PUBLISHABLE_KEY = "pk_test_51RNRl1RVExZCuSNIGyxt2rC4YlAb1wi0MJspulbkYfT6zpqCXnpF2jOhkM0tjFQo1QtmHcbJqwExUsbkDG6c6o1i00rvJJEqBZ" // 🔁 Replace with your real publishable key
-    let stripe;
 
-    async function initStripe() {
-      if (!stripe) {
-        const stripeJs = document.createElement("script");
-        stripeJs.src = "https://js.stripe.com/v3/";
-        document.head.appendChild(stripeJs);
-        await new Promise(res => stripeJs.onload = res);
-        stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+    async function startCheckout() {
+      const email = prompt("Enter your email:");
+      if (!email || !email.includes("@")) return alert("Invalid email");
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const json = await res.json();
+      if (json.sessionId) window.location = json.url;
+    }
+
+    async function searchDeals() {
+      const query = document.getElementById("searchInput").value;
+      const userKey = document.getElementById("userKey").value;
+      const site = document.getElementById("siteSelect").value;
+      const resultsDiv = document.getElementById("results");
+
+      if (!userKey || !userKey.startsWith("cus_")) {
+        resultsDiv.innerHTML = "⚠️ Enter a valid Stripe customer ID.";
+        return;
+      }
+
+      const isValid = await fetch("/api/validate-customer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userKey })
+      }).then(res => res.json());
+
+      if (!isValid.valid) {
+        resultsDiv.innerHTML = `⚠️ Access denied: ${isValid.error || "Subscription required."}`;
+        return;
+      }
+
+      resultsDiv.innerHTML = "🔎 Searching...";
+      try {
+        const response = await fetch(MCP_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tool: "find_best_deals",
+            parameters: { query, userKey, site }
+          })
+        });
+
+        const data = await response.json();
+        if (data.deals?.length > 0) {
+          resultsDiv.innerHTML = data.deals.map(deal => `
+            <div class="deal">
+              <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a><br />
+              <span>${deal.price}</span>
+            </div>`).join("");
+        } else {
+          resultsDiv.innerHTML = "No deals found.";
+        }
+      } catch (err) {
+        console.error("Error:", err);
+        resultsDiv.innerHTML = "Something went wrong.";
       }
     }
-
-   async function startCheckout() {
-  await initStripe();
-
-  const email = prompt("Enter your email:");
-  if (!email || !email.includes("@")) {
-    alert("Enter a valid email!");
-    return;
-  }
-
-  try {
-    const res = await fetch("/api/create-checkout-session", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email }),
-});
-
-console.log("🔁 Raw response status:", res.status);
-
-const contentType = res.headers.get("Content-Type") || "";
-if (!contentType.includes("application/json")) {
-  const text = await res.text();
-  console.error("🚨 Non-JSON response body:", text);
-  throw new Error("Non-JSON response: " + text);
-}
-
-const json = await res.json();
-console.log("📦 JSON body:", json);
-
-const { sessionId } = json;
-if (!sessionId) throw new Error("No sessionId returned from backend");
-
-
-    await stripe.redirectToCheckout({ sessionId });
-
-  } catch (err) {
-    console.error("❌ Checkout Error:", err);
-    alert("Stripe checkout failed: " + err.message);
-  }
-}
-
-
-
-async function searchDeals() {
-  const query = document.getElementById("searchInput").value;
-  const userKey = document.getElementById("userKey").value;
-  const resultsDiv = document.getElementById("results");
-
-  // 🛡️ Validate userKey BEFORE proceeding (✅ fixed)
-const isValid = await fetch("/api/validate-customer", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ userKey })
-}).then(res => res.json());
-
-  if (!isValid.valid) {
-    resultsDiv.innerHTML = `⚠️ Access denied: ${isValid.error || "You need a subscription to use this tool."}`;
-    return;
-  }
-
-  if (!userKey.startsWith("cus_")) {
-    resultsDiv.innerHTML = "⚠️ Enter a valid Stripe customer ID.";
-    return;
-  }
-
-  resultsDiv.innerHTML = "🔎 Searching...";
-  
-  try {
-    const response = await fetch(MCP_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tool: "find_best_deals",
-        parameters: {
-          query,
-          userKey,
-          site: "amazon"
-        }
-      })
-    });
-
-    const data = await response.json();
-    console.log("✅ Deals:", data);
-
-    if (data.deals && data.deals.length > 0) {
-      resultsDiv.innerHTML = data.deals.map(deal => `
-        <div class="deal">
-          <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a><br />
-          <span>${deal.price}</span>
-        </div>
-      `).join('');
-    } else {
-      resultsDiv.innerHTML = "No deals found.";
-    }
-  } catch (err) {
-    console.error("❌ Error fetching deals:", err);
-    resultsDiv.innerHTML = "Something went wrong.";
-  }
-}
-// ✅ Auto-fill and hide Customer ID input if already subscribed
-document.addEventListener("DOMContentLoaded", () => {
-  const savedId = localStorage.getItem("stripe_customer_id");
-
-  const userKeyInput = document.getElementById("userKey");
-  const loginBtn = document.querySelector("button[onclick='startCheckout()']")
-
-  if (savedId && userKeyInput) {
-    userKeyInput.value = savedId;
-
-    // 🎯 Auto-hide the input + login button
-    userKeyInput.style.display = "none";
-    if (loginBtn) loginBtn.style.display = "none";
-
-    // ✅ Optional: Show confirmation banner
-    const banner = document.createElement("p");
-    banner.innerText = `🔓 You're already subscribed!`;
-    banner.style.marginTop = "1rem";
-    banner.style.fontWeight = "bold";
-    banner.style.color = "green";
-    userKeyInput.parentNode.insertBefore(banner, userKeyInput);
-  }
-});
-
-
   </script>
 </body>
 </html>
