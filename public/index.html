@@ -1,4 +1,3 @@
-<!-- Updated public/index.html with scoring + stripe preserved -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,23 +31,17 @@
       width: 90%;
       max-width: 600px;
     }
-    .tag {
-      font-size: 0.9rem;
-      background: gold;
-      padding: 0.25rem 0.5rem;
-      margin-left: 10px;
-      border-radius: 4px;
-    }
     .score {
       font-weight: bold;
-      float: right;
+      color: #007b00;
     }
-    .banner {
-      background: #eee;
-      padding: 0.5rem;
-      margin-top: 10px;
-      font-size: 0.9rem;
-      border-left: 5px solid #999;
+    .tag {
+      background-color: gold;
+      color: black;
+      font-size: 0.8rem;
+      padding: 2px 6px;
+      margin-left: 8px;
+      border-radius: 4px;
     }
   </style>
 </head>
@@ -56,7 +49,9 @@
   <h1>🛒 Find Best Deals (Amazon + eBay)</h1>
 
   <button onclick="startCheckout()" style="background: #00aa66; color: white;">Login to Unlock (Stripe)</button>
+
   <input type="text" id="userKey" placeholder="Paste your Stripe Customer ID here (cus_...)" required />
+
   <input type="text" id="searchInput" placeholder="e.g. noise cancelling headphones" />
 
   <select id="siteSelect">
@@ -67,7 +62,6 @@
 
   <button onclick="searchDeals()">Find Deals</button>
 
-  <div class="banner">🎯 Target deals (if available) are from Oakland, CA. Results may vary by location.</div>
   <div id="results" style="margin-top: 2rem;">Search something to see results!</div>
 
   <script>
@@ -84,23 +78,6 @@
       });
       const json = await res.json();
       if (json.sessionId) window.location = json.url;
-    }
-
-    function scoreDeal(title, priceStr) {
-      const price = parseFloat(priceStr.replace(/[^\d.]/g, "")) || 999;
-      let score = 0;
-      if (title.toLowerCase().includes("deal") || title.toLowerCase().includes("discount")) score += 30;
-      if (price < 20) score += 30;
-      else if (price < 50) score += 20;
-      if (title.toLowerCase().includes("best") || title.toLowerCase().includes("top")) score += 20;
-      return score;
-    }
-
-    function getTag(score) {
-      if (score >= 70) return "🏆 Top Pick";
-      if (score >= 50) return "🎯 Best Value";
-      if (score >= 30) return "🔥 Most Reviewed";
-      return "";
     }
 
     async function searchDeals() {
@@ -138,16 +115,13 @@
 
         const data = await response.json();
         if (data.deals?.length > 0) {
-          resultsDiv.innerHTML = data.deals.map(deal => {
-            const score = scoreDeal(deal.title, deal.price);
-            const tag = getTag(score);
-            return `<div class="deal">
-              <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a>
-              <span class="score">Score: ${score}</span><br/>
-              <span>${deal.price}</span>
-              ${tag ? `<span class="tag">${tag}</span>` : ""}
-            </div>`;
-          }).join("");
+          resultsDiv.innerHTML = data.deals.map(deal => `
+            <div class="deal">
+              <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a><br />
+              <span>${deal.price}</span><br />
+              ${deal.score ? `<span class="score">Score: ${deal.score}</span>` : ""}
+              ${deal.tag ? `<span class="tag">${deal.tag}</span>` : ""}
+            </div>`).join("");
         } else {
           resultsDiv.innerHTML = "No deals found.";
         }
