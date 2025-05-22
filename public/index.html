@@ -1,4 +1,4 @@
-<!-- Updated public/index.html -->
+<!-- Updated public/index.html with scoring + stripe preserved -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,27 +32,42 @@
       width: 90%;
       max-width: 600px;
     }
+    .tag {
+      font-size: 0.9rem;
+      background: gold;
+      padding: 0.25rem 0.5rem;
+      margin-left: 10px;
+      border-radius: 4px;
+    }
+    .score {
+      font-weight: bold;
+      float: right;
+    }
+    .banner {
+      background: #eee;
+      padding: 0.5rem;
+      margin-top: 10px;
+      font-size: 0.9rem;
+      border-left: 5px solid #999;
+    }
   </style>
 </head>
 <body>
-  <h1>🛒 Find Best Deals (Amazon + ebay)</h1>
+  <h1>🛒 Find Best Deals (Amazon + eBay)</h1>
 
   <button onclick="startCheckout()" style="background: #00aa66; color: white;">Login to Unlock (Stripe)</button>
-
-  <!-- 🧾 Stripe Customer ID Input -->
   <input type="text" id="userKey" placeholder="Paste your Stripe Customer ID here (cus_...)" required />
-
   <input type="text" id="searchInput" placeholder="e.g. noise cancelling headphones" />
 
   <select id="siteSelect">
-  <option value="all">Amazon + ebay</option>
-  <option value="amazon">Amazon Only</option>
-  <option value="ebay">Ebay Only</option>
-</select>
-
+    <option value="all">Amazon + eBay</option>
+    <option value="amazon">Amazon Only</option>
+    <option value="ebay">eBay Only</option>
+  </select>
 
   <button onclick="searchDeals()">Find Deals</button>
 
+  <div class="banner">🎯 Target deals (if available) are from Oakland, CA. Results may vary by location.</div>
   <div id="results" style="margin-top: 2rem;">Search something to see results!</div>
 
   <script>
@@ -71,12 +86,28 @@
       if (json.sessionId) window.location = json.url;
     }
 
+    function scoreDeal(title, priceStr) {
+      const price = parseFloat(priceStr.replace(/[^\d.]/g, "")) || 999;
+      let score = 0;
+      if (title.toLowerCase().includes("deal") || title.toLowerCase().includes("discount")) score += 30;
+      if (price < 20) score += 30;
+      else if (price < 50) score += 20;
+      if (title.toLowerCase().includes("best") || title.toLowerCase().includes("top")) score += 20;
+      return score;
+    }
+
+    function getTag(score) {
+      if (score >= 70) return "🏆 Top Pick";
+      if (score >= 50) return "🎯 Best Value";
+      if (score >= 30) return "🔥 Most Reviewed";
+      return "";
+    }
+
     async function searchDeals() {
       const query = document.getElementById("searchInput").value;
       const userKey = document.getElementById("userKey").value;
       const site = document.getElementById("siteSelect").value;
       const resultsDiv = document.getElementById("results");
-      //const site = document.getElementById("siteSelect").value;
 
       if (!userKey || !userKey.startsWith("cus_")) {
         resultsDiv.innerHTML = "⚠️ Enter a valid Stripe customer ID.";
@@ -107,11 +138,16 @@
 
         const data = await response.json();
         if (data.deals?.length > 0) {
-          resultsDiv.innerHTML = data.deals.map(deal => `
-            <div class="deal">
-              <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a><br />
+          resultsDiv.innerHTML = data.deals.map(deal => {
+            const score = scoreDeal(deal.title, deal.price);
+            const tag = getTag(score);
+            return `<div class="deal">
+              <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a>
+              <span class="score">Score: ${score}</span><br/>
               <span>${deal.price}</span>
-            </div>`).join("");
+              ${tag ? `<span class="tag">${tag}</span>` : ""}
+            </div>`;
+          }).join("");
         } else {
           resultsDiv.innerHTML = "No deals found.";
         }
