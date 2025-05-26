@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
       customer: customer.id,
       line_items: [
         {
-          price: "price_1RNRw6RVExZCuSNIoVn3EBjv",
+          price: "price_1RStLBDO9jbWFQsorMdIWh6i",
           quantity: 1,
         },
       ],
