@@ -78,8 +78,8 @@
       body: JSON.stringify({ email })
     });
     const json = await res.json();
-    if (json.sessionId) {
-  window.location.href = `https://checkout.stripe.com/c/${json.sessionId}`;
+    if (json.url) {
+  window.location.href = json.url;
 }
 
   }
