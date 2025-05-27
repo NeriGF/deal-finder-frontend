@@ -12,11 +12,11 @@ module.exports = async (req, res) => {
     const customer = await stripe.customers.retrieve(session.customer);
 
     return res.status(200).json({
-      customerId: session.customer,
-      email: session.customer_email
+      customerId: customer.id,
+      email: customer.email
     });
   } catch (err) {
-    console.error("Lookup session failed:", err.message);
-    res.status(500).json({ error: "Failed to lookup session" });
+    console.error("❌ Lookup session failed:", err.message);
+    return res.status(500).json({ error: "Failed to lookup session" });
   }
 };
