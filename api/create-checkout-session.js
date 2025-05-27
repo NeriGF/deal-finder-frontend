@@ -32,7 +32,11 @@ module.exports = async (req, res) => {
     });
 
     console.log("✅ Stripe session created:", session.id);
-    return res.status(200).json({ sessionId: session.id });
+    return res.status(200).json({
+  sessionId: session.id,
+  url: session.url  // ✅ Add this!
+});
+
   } catch (err) {
     console.error("❌ Error creating Stripe session:", err.message);
     return res.status(500).json({ error: "Server error creating Stripe session" });
