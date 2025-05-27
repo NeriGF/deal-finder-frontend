@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({ url: session.url });
   } catch (err) {
-    console.error("❌ Billing portal error:", err.message);
+    console.error("❌ Billing portal creation failed:", err.message);
     return res.status(500).json({ error: "Failed to create billing portal session" });
   }
 };
