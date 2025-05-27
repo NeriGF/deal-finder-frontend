@@ -179,11 +179,16 @@
     });
 
     const json = await res.json();
-    if (json.url) {
-      window.location.href = json.url; // ✅ Redirects to Stripe
-    } else {
-      alert("❌ Failed to open billing portal.");
-    }
+
+if (json.url) {
+  window.location.href = json.url; // ✅ Successful case
+} else if (json.error?.includes("No such customer")) {
+  alert("⚠️ This customer ID no longer exists. Please sign up again.");
+  localStorage.removeItem("stripe_customer_id"); // 🔁 Optional: clear old ID
+} else {
+  alert("❌ Failed to open billing portal.");
+}
+
   }
 </script>
 
