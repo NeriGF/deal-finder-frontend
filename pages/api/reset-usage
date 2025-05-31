@@ -1,0 +1,67 @@
+module.exports = async (req, env) => {
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  };
+
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Only POST allowed" }), {
+      status: 405,
+      headers: corsHeaders,
+    });
+  }
+
+  const token = req.headers.get("authorization");
+  if (token !== `Bearer ${env.ADMIN_PASSWORD}`) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 403,
+      headers: corsHeaders,
+    });
+  }
+
+  let body;
+try {
+  const text = await req.text();
+  console.log("🧾 Raw body text:", text);  // NEW
+  body = JSON.parse(text);
+  console.log("📦 Parsed body object:", body);  // NEW
+} catch (err) {
+  console.error("❌ Failed to parse body:", err);
+  return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+    status: 400,
+    headers: corsHeaders,
+  });
+}
+
+
+
+  const { customerId } = body;
+  if (!customerId || !customerId.startsWith("cus_")) {
+    return new Response(JSON.stringify({ error: "Invalid customer ID" }), {
+      status: 400,
+      headers: corsHeaders,
+    });
+  }
+
+  try {
+    const now = new Date();
+    const monthKey = `${customerId}_${now.getFullYear()}-${now.getMonth() + 1}`;
+    await env.USAGE_KV.put(monthKey, "0");
+    console.log(`✅ Reset usage for: ${monthKey}`);
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: corsHeaders,
+    });
+  } catch (err) {
+    console.error("❌ Error resetting usage:", err);
+    return new Response(JSON.stringify({ error: "Failed to reset usage." }), {
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+};
