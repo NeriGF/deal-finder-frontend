@@ -73,7 +73,7 @@
   async function startCheckout() {
     const email = prompt("Enter your email:");
     if (!email || !email.includes("@")) return alert("Invalid email");
-    const res = await fetch("/pages/api/create-checkout-session", {
+    const res = await fetch("/api/create-checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email })
@@ -96,7 +96,7 @@
       return;
     }
 
-    const isValid = await fetch("/pages/api/validate-customer", {
+    const isValid = await fetch("/api/validate-customer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userKey })
@@ -172,7 +172,7 @@
       return;
     }
 
-    const res = await fetch("/pages/api/create-billing-portal-session", {
+    const res = await fetch("/api/create-billing-portal-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ customerId })
