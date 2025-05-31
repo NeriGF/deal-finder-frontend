@@ -18,7 +18,7 @@
 <script>
   const token = localStorage.getItem("admin_token");
 
-  fetch("/pages/api/list-customers", {
+  fetch("/api/list-customers", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -44,7 +44,7 @@
     });
   // ✅ Reset usage function
   function resetUsage(customerId) {
-  fetch("/pages/api/proxy-reset", {
+  fetch("/api/proxy-reset", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
