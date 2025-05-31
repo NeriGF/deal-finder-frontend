@@ -38,7 +38,7 @@
     if (!sessionId) {
       status.innerText = "⚠️ No session ID found in URL.";
     } else {
-      fetch("/api/lookup-session", {
+      fetch("/pages/api/lookup-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId }),
