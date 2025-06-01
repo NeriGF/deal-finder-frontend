@@ -90,82 +90,64 @@ export default function HomePage() {
         }
 
         async function searchDeals() {
-          const query = document.getElementById("searchInput").value;
-          const userKey = document.getElementById("userKey").value;
-          const site = document.getElementById("siteSelect").value;
-          const resultsDiv = document.getElementById("results");
+  const query = document.getElementById("searchInput").value;
+  const userKey = document.getElementById("userKey").value;
+  const site = document.getElementById("siteSelect").value;
+  const resultsDiv = document.getElementById("results");
 
-          if (!userKey || !userKey.startsWith("cus_")) {
-            resultsDiv.innerHTML = "⚠️ Enter a valid Stripe customer ID.";
-            return;
-          }
+  console.log("🔍 Submitting search with:", { query, userKey, site });
 
-          const isValid = await fetch("/api/validate-customer", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userKey })
-          }).then(res => res.json());
+  if (!userKey || !userKey.startsWith("cus_")) {
+    resultsDiv.innerHTML = "⚠️ Enter a valid Stripe customer ID.";
+    return;
+  }
 
-          if (!isValid.valid) {
-            resultsDiv.innerHTML = \`⚠️ Access denied: \${isValid.error || "Subscription required."}\`;
-            return;
-          }
+  const isValid = await fetch("/api/validate-customer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userKey })
+  }).then(res => res.json());
 
-          resultsDiv.innerHTML = "🔎 Searching...";
-          try {
-            const response = await fetch(MCP_ENDPOINT, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                tool: "find_best_deals",
-                parameters: { query, userKey, site }
-              })
-            });
+  if (!isValid.valid) {
+    resultsDiv.innerHTML = `⚠️ Access denied: ${isValid.error || "Subscription required."}`;
+    return;
+  }
 
-            const data = await response.json();
-            if (data.deals?.length > 0) {
-              resultsDiv.innerHTML = data.deals.map(deal => \`
-                <div class="deal">
-                  <a href="\${deal.url}" target="_blank"><strong>\${deal.title}</strong></a><br />
-                  <span>\${deal.price}</span><br />
-                  \${deal.score ? \`<span class="score">Score: \${deal.score}</span>\` : ""}
-                  \${deal.tag ? \`<span class="tag">\${deal.tag}</span>\` : ""}
-                </div>\`).join("");
-            } else {
-              resultsDiv.innerHTML = "No deals found.";
-            }
-          } catch (err) {
-            console.error("Error:", err);
-            resultsDiv.innerHTML = "Something went wrong.";
-          }
-        }
+  resultsDiv.innerHTML = "🔎 Searching...";
+  try {
+    const payload = {
+      tool: "find_best_deals",
+      parameters: { query, userKey, site }
+    };
 
-        async function getTopDeal() {
-          const resultsDiv = document.getElementById("results");
-          resultsDiv.innerHTML = "📦 Loading today’s top deal...";
+    console.log("📤 Sending request to MCP:", payload);
 
-          try {
-            const res = await fetch(MCP_ENDPOINT + "/get-top-deal");
-            const data = await res.json();
+    const response = await fetch(MCP_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-            if (data.error) {
-              resultsDiv.innerHTML = \`⚠️ \${data.error}\`;
-              return;
-            }
+    const data = await response.json();
+    console.log("✅ Response from MCP:", data);
 
-            resultsDiv.innerHTML = \`
-              <div class="deal">
-                <strong>🔥 Today’s Top Deal</strong><br/>
-                <a href="\${data.url}" target="_blank"><strong>\${data.title}</strong></a><br/>
-                <span>\${data.price}</span><br/>
-                <span>Score: \${data.score} | Tag: \${data.tag}</span>
-              </div>
-            \`;
-          } catch (err) {
-            resultsDiv.innerHTML = "❌ Failed to load top deal.";
-            console.error(err);
-          }
-        }
+    if (data.deals?.length > 0) {
+      resultsDiv.innerHTML = data.deals.map(deal => `
+        <div class="deal">
+          <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a><br />
+          <span>${deal.price}</span><br />
+          ${deal.score ? `<span class="score">Score: ${deal.score}</span>` : ""}
+          ${deal.tag ? `<span class="tag">${deal.tag}</span>` : ""}
+        </div>`).join("");
+    } else {
+      resultsDiv.innerHTML = "No deals found.";
+    }
+  } catch (err) {
+    console.error("❌ MCP error:", err);
+    resultsDiv.innerHTML = "Something went wrong.";
+  }
+}
+
 
         async function openBillingPortal() {
           const customerId = localStorage.getItem("stripe_customer_id");
