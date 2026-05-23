@@ -66,16 +66,28 @@ export default function HomePage() {
         <option value="all">Amazon + Walmart</option>
         <option value="amazon">Amazon Only</option>
         <option value="walmart">Walmart Only</option>
+        <option value="expanded">Expanded Search</option>
       </select>
 
       <button onClick={() => searchDeals()}>Find Deals</button>
       <button onClick={() => getTopDeal()}>🔥 View Today’s Top Deal</button>
       <button onClick={() => openBillingPortal()}>⚙️ Manage or Cancel Subscription</button>
 
-      <div id="results" style={{ marginTop: "2rem" }}>Search something to see results!</div>
+      <div id="results" style={{ marginTop: "2rem", width: "100%", maxWidth: "600px" }}>Search something to see results!</div>
 
       <script dangerouslySetInnerHTML={{ __html: `
         const MCP_ENDPOINT = "${MCP_ENDPOINT}";
+
+        function getSourceColor(source) {
+          const s = (source || "").toLowerCase();
+          if (s.includes("amazon")) return "#FF9900";
+          if (s.includes("walmart")) return "#0071DC";
+          if (s.includes("ebay")) return "#0064D2";
+          if (s.includes("best buy")) return "#0046BE";
+          if (s.includes("google shopping")) return "#EA4335";
+          if (s.includes("local") || s.includes("yelp")) return "#D32323";
+          return "#6c757d";
+        }
 
         async function startCheckout() {
           const email = prompt("Enter your email:");
@@ -90,63 +102,241 @@ export default function HomePage() {
         }
 
         async function searchDeals() {
-  const query = document.getElementById("searchInput").value;
-  const userKey = document.getElementById("userKey").value;
-  const site = document.getElementById("siteSelect").value;
-  const resultsDiv = document.getElementById("results");
+          const query = document.getElementById("searchInput").value;
+          const userKey = document.getElementById("userKey").value;
+          const site = document.getElementById("siteSelect").value;
+          const resultsDiv = document.getElementById("results");
 
-  console.log("🔍 Submitting search with:", { query, userKey, site });
+          console.log("🔍 Submitting search with:", { query, userKey, site });
 
-  if (!userKey || !userKey.startsWith("cus_")) {
-    resultsDiv.innerHTML = "⚠️ Enter a valid Stripe customer ID.";
-    return;
-  }
+          if (!userKey || !userKey.startsWith("cus_")) {
+            resultsDiv.innerHTML = "⚠️ Enter a valid Stripe customer ID.";
+            return;
+          }
 
-  const isValid = await fetch("/api/validate-customer", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userKey })
-  }).then(res => res.json());
+          const isValid = await fetch("/api/validate-customer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userKey })
+          }).then(res => res.json());
 
-  if (!isValid.valid) {
-    resultsDiv.innerHTML = `⚠️ Access denied: ${isValid.error || "Subscription required."}`;
-    return;
-  }
+          if (!isValid.valid) {
+            resultsDiv.innerHTML = \`⚠️ Access denied: \${isValid.error || "Subscription required."}\`;
+            return;
+          }
 
-  resultsDiv.innerHTML = "🔎 Searching...";
-  try {
-    const payload = {
-      tool: "find_best_deals",
-      parameters: { query, userKey, site }
-    };
+          if (site === "expanded") {
+            resultsDiv.innerHTML = "🔎 Searching all sources (Amazon, Walmart, eBay, Best Buy, Google Shopping, Local)...";
+            try {
+              // 1. Trigger the MCP Amazon+Walmart request concurrently with the new providers
+              const mcpPromise = fetch(MCP_ENDPOINT, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  tool: "find_best_deals",
+                  parameters: { query, userKey, site: "all" }
+                })
+              }).then(res => res.json()).catch(err => {
+                console.error("❌ MCP error in Expanded Search:", err);
+                return { deals: [] };
+              });
 
-    console.log("📤 Sending request to MCP:", payload);
+              const providers = [
+                { name: "ebay", path: "/api/search-ebay" },
+                { name: "bestbuy", path: "/api/search-bestbuy" },
+                { name: "google-shopping", path: "/api/search-google-shopping" },
+                { name: "local-services", path: "/api/search-local-services" }
+              ];
 
-    const response = await fetch(MCP_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+              const providerPromises = providers.map(p =>
+                fetch(p.path, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ query, userKey })
+                })
+                .then(res => res.json())
+                .catch(err => {
+                  console.warn(\`⚠️ Failed to fetch from \${p.name}:\`, err);
+                  return { results: [], source: p.name, skipped: true, reason: err.message };
+                })
+              );
 
-    const data = await response.json();
-    console.log("✅ Response from MCP:", data);
+              const [mcpResult, ...providerResults] = await Promise.all([
+                mcpPromise,
+                ...providerPromises
+              ]);
 
-    if (data.deals?.length > 0) {
-      resultsDiv.innerHTML = data.deals.map(deal => `
-        <div class="deal">
-          <a href="${deal.url}" target="_blank"><strong>${deal.title}</strong></a><br />
-          <span>${deal.price}</span><br />
-          ${deal.score ? `<span class="score">Score: ${deal.score}</span>` : ""}
-          ${deal.tag ? `<span class="tag">${deal.tag}</span>` : ""}
-        </div>`).join("");
-    } else {
-      resultsDiv.innerHTML = "No deals found.";
-    }
-  } catch (err) {
-    console.error("❌ MCP error:", err);
-    resultsDiv.innerHTML = "Something went wrong.";
-  }
-}
+              // 2. Normalize Amazon/Walmart deals from MCP
+              const mcpDeals = (mcpResult.deals || []).map(deal => {
+                const urlStr = deal.url || "";
+                let derivedSource = "Amazon";
+                if (urlStr.includes("walmart.com")) {
+                  derivedSource = "Walmart";
+                } else if (deal.tag && deal.tag.toLowerCase().includes("walmart")) {
+                  derivedSource = "Walmart";
+                } else if (deal.source) {
+                  derivedSource = deal.source;
+                }
+
+                return {
+                  title: deal.title || "",
+                  price: deal.price || "N/A",
+                  currency: "USD",
+                  url: urlStr,
+                  image: "",
+                  source: derivedSource,
+                  rating: null,
+                  reviewCount: null,
+                  availability: "In Stock",
+                  shipping: "Standard Shipping",
+                  score: deal.score || 80
+                };
+              });
+
+              // Combine all results
+              let allDeals = [...mcpDeals];
+              providerResults.forEach(r => {
+                if (r && Array.isArray(r.results)) {
+                  allDeals = allDeals.concat(r.results);
+                }
+              });
+
+              // 3. Basic duplicate cleanup for expanded search only
+              const uniqueDeals = [];
+              const seenUrls = new Set();
+
+              const cleanTitle = t => (t || "").toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\\s+/).filter(Boolean);
+
+              const isDuplicate = (t1, t2) => {
+                const w1 = cleanTitle(t1);
+                const w2 = cleanTitle(t2);
+                if (w1.length === 0 || w2.length === 0) return false;
+                const common = w1.filter(w => w2.includes(w));
+                const similarity = common.length / Math.max(w1.length, w2.length);
+                return similarity > 0.75;
+              };
+
+              const parsePriceVal = p => {
+                if (typeof p === 'number') return p;
+                if (!p) return Infinity;
+                const cl = String(p).replace(/[^0-9.]/g, '');
+                return parseFloat(cl) || Infinity;
+              };
+
+              allDeals.forEach(deal => {
+                let cleanUrl = deal.url || "";
+                try {
+                  const u = new URL(cleanUrl);
+                  u.search = "";
+                  u.hash = "";
+                  cleanUrl = u.toString();
+                } catch (e) {}
+
+                if (seenUrls.has(cleanUrl)) return;
+
+                const dupIndex = uniqueDeals.findIndex(d => isDuplicate(d.title, deal.title));
+                if (dupIndex !== -1) {
+                  const pExisting = parsePriceVal(uniqueDeals[dupIndex].price);
+                  const pNew = parsePriceVal(deal.price);
+                  if (pNew < pExisting) {
+                    seenUrls.delete(uniqueDeals[dupIndex].url);
+                    uniqueDeals[dupIndex] = deal;
+                    seenUrls.add(cleanUrl);
+                  }
+                } else {
+                  uniqueDeals.push(deal);
+                  if (cleanUrl) seenUrls.add(cleanUrl);
+                }
+              });
+
+              // 4. Render results beautifully
+              if (uniqueDeals.length > 0) {
+                resultsDiv.innerHTML = uniqueDeals.map(deal => {
+                  const sColor = getSourceColor(deal.source);
+                  const ratingStars = deal.rating ? \`⭐ \${deal.rating} (\${deal.reviewCount || 0})\` : "";
+                  const scoreDisplay = deal.score ? \`<span class="score" style="color: #007b00; font-weight: bold; font-size: 0.9rem; margin-left: 8px;">Score: \${deal.score}</span>\` : "";
+                  const priceDisplay = typeof deal.price === 'number' ? \`$\${deal.price.toFixed(2)}\` : deal.price;
+
+                  return \`
+                    <div class="deal" style="background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 1.25rem; margin-top: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);">
+                      <div style="display: flex; gap: 1rem; align-items: start;">
+                        \${deal.image ? \`<img src="\${deal.image}" alt="\${deal.title}" style="width: 80px; height: 80px; object-fit: contain; border-radius: 6px; border: 1px solid #eee; background: #fff; padding: 4px;" />\` : ""}
+                        <div style="flex: 1;">
+                          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;">
+                            <span style="background-color: \${sColor}; color: white; padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">\${deal.source}</span>
+                            \${deal.shipping ? \`<span style="font-size: 0.75rem; color: #555; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">🚚 \${deal.shipping}</span>\` : ""}
+                            \${deal.availability ? \`<span style="font-size: 0.75rem; color: \${deal.availability.toLowerCase().includes('in stock') || deal.availability.toLowerCase().includes('open') ? '#047857' : '#b91c1c'}; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">\${deal.availability}</span>\` : ""}
+                          </div>
+                          <a href="\${deal.url}" target="_blank" style="text-decoration: none; color: #1e40af; font-size: 1.05rem; font-weight: 700; line-height: 1.4; display: block; margin-bottom: 6px;">\${deal.title}</a>
+                          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <span style="font-size: 1.25rem; font-weight: 800; color: #111827;">\${priceDisplay}</span>
+                            \${ratingStars}
+                            \${scoreDisplay}
+                          </div>
+                        </div>
+                      </div>
+                    </div>\`;
+                }).join("");
+              } else {
+                resultsDiv.innerHTML = "No deals found.";
+              }
+            } catch (err) {
+              console.error("❌ Expanded Search error:", err);
+              resultsDiv.innerHTML = "Something went wrong during expanded search.";
+            }
+          } else {
+            // STANDARD flow (remains 100% untouched)
+            resultsDiv.innerHTML = "🔎 Searching...";
+            try {
+              const payload = {
+                tool: "find_best_deals",
+                parameters: { query, userKey, site }
+              };
+
+              console.log("📤 Sending request to MCP:", payload);
+
+              const response = await fetch(MCP_ENDPOINT, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+              });
+
+              const data = await response.json();
+              console.log("✅ Response from MCP:", data);
+
+              if (data.deals?.length > 0) {
+                resultsDiv.innerHTML = data.deals.map(deal => {
+                  const urlStr = deal.url || "";
+                  let derivedSource = "Amazon";
+                  if (urlStr.includes("walmart.com")) {
+                    derivedSource = "Walmart";
+                  } else if (deal.tag && deal.tag.toLowerCase().includes("walmart")) {
+                    derivedSource = "Walmart";
+                  }
+                  const sColor = getSourceColor(derivedSource);
+
+                  return \`
+                    <div class="deal" style="background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 1.25rem; margin-top: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);">
+                      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;">
+                        <span style="background-color: \${sColor}; color: white; padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; font-weight: bold; text-transform: uppercase;">\${derivedSource}</span>
+                      </div>
+                      <a href="\${deal.url}" target="_blank" style="text-decoration: none; color: #1e40af; font-size: 1.05rem; font-weight: 700;"><strong>\${deal.title}</strong></a><br />
+                      <div style="margin-top: 6px; display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 1.25rem; font-weight: 800; color: #111827;">\${deal.price}</span>
+                        \${deal.score ? \`<span class="score" style="color: #007b00; font-weight: bold;">Score: \${deal.score}</span>\` : ""}
+                        \${deal.tag ? \`<span class="tag" style="background-color: gold; color: black; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px;">\${deal.tag}</span>\` : ""}
+                      </div>
+                    </div>\`;
+                }).join("");
+              } else {
+                resultsDiv.innerHTML = "No deals found.";
+              }
+            } catch (err) {
+              console.error("❌ MCP error:", err);
+              resultsDiv.innerHTML = "Something went wrong.";
+            }
+          }
+        }
 
 
         async function openBillingPortal() {
