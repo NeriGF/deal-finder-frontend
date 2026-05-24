@@ -64,6 +64,8 @@ module.exports = async (req, res) => {
           };
         });
 
+        console.log(`Local Services (Yelp): ${results.length}`);
+
         return res.status(200).json({
           results,
           source
@@ -107,6 +109,8 @@ module.exports = async (req, res) => {
             score: ratingVal ? Math.round(ratingVal * 20) : 80
           };
         });
+
+        console.log(`Local Services (Google Places): ${results.length}`);
 
         return res.status(200).json({
           results,

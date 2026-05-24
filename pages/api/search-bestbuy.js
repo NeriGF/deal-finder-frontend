@@ -66,6 +66,8 @@ module.exports = async (req, res) => {
       };
     });
 
+    console.log(`Best Buy: ${results.length}`);
+
     return res.status(200).json({
       results,
       source

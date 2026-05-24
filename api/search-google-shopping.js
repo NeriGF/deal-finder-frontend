@@ -65,6 +65,8 @@ module.exports = async (req, res) => {
       };
     });
 
+    console.log(`Google Shopping: ${results.length}`);
+
     return res.status(200).json({
       results,
       source

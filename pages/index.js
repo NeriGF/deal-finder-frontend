@@ -73,6 +73,16 @@ export default function HomePage() {
       <button onClick={() => getTopDeal()}>🔥 View Today’s Top Deal</button>
       <button onClick={() => openBillingPortal()}>⚙️ Manage or Cancel Subscription</button>
 
+      <div id="warningSection" style={{ display: "none", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "12px", padding: "1rem", marginTop: "1rem", width: "100%", maxWidth: "600px", color: "#b45309", fontSize: "0.9rem" }}></div>
+
+      <div id="aiSummarySection" style={{ display: "none", background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)", border: "1px solid #bbf7d0", borderRadius: "16px", padding: "1.5rem", marginTop: "1.5rem", marginBottom: "1rem", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)", width: "100%", maxWidth: "600px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+          <span style={{ fontSize: "1.5rem" }}>✨</span>
+          <h3 style={{ margin: 0, color: "#166534", fontSize: "1.3rem", fontWeight: 800 }}>AI Deal Summary</h3>
+        </div>
+        <div id="aiSummaryContent" style={{ color: "#1e3a1e", fontSize: "0.95rem", lineHeight: 1.6 }}></div>
+      </div>
+
       <div id="results" style={{ marginTop: "2rem", width: "100%", maxWidth: "600px" }}>Search something to see results!</div>
 
       <script dangerouslySetInnerHTML={{ __html: `
@@ -106,6 +116,9 @@ export default function HomePage() {
           const userKey = document.getElementById("userKey").value;
           const site = document.getElementById("siteSelect").value;
           const resultsDiv = document.getElementById("results");
+          const warningSection = document.getElementById("warningSection");
+          const aiSummarySection = document.getElementById("aiSummarySection");
+          const aiSummaryContent = document.getElementById("aiSummaryContent");
 
           console.log("🔍 Submitting search with:", { query, userKey, site });
 
@@ -113,6 +126,11 @@ export default function HomePage() {
             resultsDiv.innerHTML = "⚠️ Enter a valid Stripe customer ID.";
             return;
           }
+
+          if (warningSection) warningSection.style.display = "none";
+          if (aiSummarySection) aiSummarySection.style.display = "none";
+
+          resultsDiv.innerHTML = "🔎 Validating subscription...";
 
           const isValid = await fetch("/api/validate-customer", {
             method: "POST",
@@ -125,216 +143,288 @@ export default function HomePage() {
             return;
           }
 
-          if (site === "expanded") {
-            resultsDiv.innerHTML = "🔎 Searching all sources (Amazon, Walmart, eBay, Best Buy, Google Shopping, Local)...";
-            try {
-              // 1. Trigger the MCP Amazon+Walmart request concurrently with the new providers
-              const mcpPromise = fetch(MCP_ENDPOINT, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  tool: "find_best_deals",
-                  parameters: { query, userKey, site: "all" }
-                })
-              }).then(res => res.json()).catch(err => {
-                console.error("❌ MCP error in Expanded Search:", err);
-                return { deals: [] };
-              });
+          resultsDiv.innerHTML = "🔎 Searching deals...";
 
-              const providers = [
+          try {
+            const promises = [];
+            const labels = [];
+
+            // Amazon MCP
+            if (site === "all" || site === "amazon" || site === "expanded") {
+              promises.push(
+                fetch(MCP_ENDPOINT, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    tool: "find_best_deals",
+                    parameters: { query, userKey, site: "amazon" }
+                  })
+                })
+                .then(res => res.json())
+                .catch(err => {
+                  console.error("Amazon fetch error:", err);
+                  return { deals: [], error: err.message };
+                })
+              );
+              labels.push("amazon");
+            }
+
+            // Walmart MCP
+            if (site === "all" || site === "walmart" || site === "expanded") {
+              promises.push(
+                fetch(MCP_ENDPOINT, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    tool: "find_best_deals",
+                    parameters: { query, userKey, site: "walmart" }
+                  })
+                })
+                .then(res => res.json())
+                .catch(err => {
+                  console.error("Walmart fetch error:", err);
+                  return { deals: [], error: err.message };
+                })
+              );
+              labels.push("walmart");
+            }
+
+            // Additional providers for Expanded Search
+            if (site === "expanded") {
+              const extraProviders = [
                 { name: "ebay", path: "/api/search-ebay" },
                 { name: "bestbuy", path: "/api/search-bestbuy" },
                 { name: "google-shopping", path: "/api/search-google-shopping" },
                 { name: "local-services", path: "/api/search-local-services" }
               ];
 
-              const providerPromises = providers.map(p =>
-                fetch(p.path, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ query, userKey })
-                })
-                .then(res => res.json())
-                .catch(err => {
-                  console.warn(\`⚠️ Failed to fetch from \${p.name}:\`, err);
-                  return { results: [], source: p.name, skipped: true, reason: err.message };
-                })
-              );
-
-              const [mcpResult, ...providerResults] = await Promise.all([
-                mcpPromise,
-                ...providerPromises
-              ]);
-
-              // 2. Normalize Amazon/Walmart deals from MCP
-              const mcpDeals = (mcpResult.deals || []).map(deal => {
-                const urlStr = deal.url || "";
-                let derivedSource = "Amazon";
-                if (urlStr.includes("walmart.com")) {
-                  derivedSource = "Walmart";
-                } else if (deal.tag && deal.tag.toLowerCase().includes("walmart")) {
-                  derivedSource = "Walmart";
-                } else if (deal.source) {
-                  derivedSource = deal.source;
-                }
-
-                return {
-                  title: deal.title || "",
-                  price: deal.price || "N/A",
-                  currency: "USD",
-                  url: urlStr,
-                  image: "",
-                  source: derivedSource,
-                  rating: null,
-                  reviewCount: null,
-                  availability: "In Stock",
-                  shipping: "Standard Shipping",
-                  score: deal.score || 80
-                };
+              extraProviders.forEach(p => {
+                promises.push(
+                  fetch(p.path, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query, userKey })
+                  })
+                  .then(res => res.json())
+                  .catch(err => {
+                    console.warn(\`⚠️ Failed to fetch from \${p.name}:\`, err);
+                    return { results: [], source: p.name, skipped: true, reason: err.message };
+                  })
+                );
+                labels.push(p.name);
               });
+            }
 
-              // Combine all results
-              let allDeals = [...mcpDeals];
-              providerResults.forEach(r => {
-                if (r && Array.isArray(r.results)) {
-                  allDeals = allDeals.concat(r.results);
+            const rawResults = await Promise.all(promises);
+            let allDeals = [];
+            let amazonFailed = false;
+
+            rawResults.forEach((res, index) => {
+              const label = labels[index];
+              
+              if (label === "amazon") {
+                const deals = res.deals || [];
+                if (res.error || deals.length === 0) {
+                  amazonFailed = true;
+                }
+                
+                deals.forEach(deal => {
+                  allDeals.push({
+                    title: deal.title || "",
+                    price: deal.price || "N/A",
+                    currency: "USD",
+                    url: deal.url || "",
+                    image: "",
+                    source: "Amazon",
+                    rating: null,
+                    reviewCount: null,
+                    availability: "In Stock",
+                    shipping: "Standard Shipping",
+                    score: deal.score || 80
+                  });
+                });
+              } else if (label === "walmart") {
+                const deals = res.deals || [];
+                deals.forEach(deal => {
+                  allDeals.push({
+                    title: deal.title || "",
+                    price: deal.price || "N/A",
+                    currency: "USD",
+                    url: deal.url || "",
+                    image: "",
+                    source: "Walmart",
+                    rating: null,
+                    reviewCount: null,
+                    availability: "In Stock",
+                    shipping: "Standard Shipping",
+                    score: deal.score || 80
+                  });
+                });
+              } else {
+                if (res && Array.isArray(res.results)) {
+                  allDeals = allDeals.concat(res.results);
+                }
+              }
+            });
+
+            if ((site === "all" || site === "amazon" || site === "expanded") && amazonFailed && warningSection) {
+              warningSection.innerHTML = "⚠️ Note: Amazon search returned no results or encountered an issue. Showing remaining results.";
+              warningSection.style.display = "block";
+            }
+
+            const uniqueDeals = [];
+            const seenUrls = new Set();
+
+            const cleanTitle = t => (t || "").toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\\s+/).filter(Boolean);
+
+            const isDuplicate = (t1, t2) => {
+              const w1 = cleanTitle(t1);
+              const w2 = cleanTitle(t2);
+              if (w1.length === 0 || w2.length === 0) return false;
+              const common = w1.filter(w => w2.includes(w));
+              const similarity = common.length / Math.max(w1.length, w2.length);
+              return similarity > 0.75;
+            };
+
+            const parsePriceVal = p => {
+              if (typeof p === 'number') return p;
+              if (!p) return Infinity;
+              const cl = String(p).replace(/[^0-9.]/g, '');
+              return parseFloat(cl) || Infinity;
+            };
+
+            allDeals.forEach(deal => {
+              let cleanUrl = deal.url || "";
+              try {
+                const u = new URL(cleanUrl);
+                u.search = "";
+                u.hash = "";
+                cleanUrl = u.toString();
+              } catch (e) {}
+
+              if (seenUrls.has(cleanUrl)) return;
+
+              const dupIndex = uniqueDeals.findIndex(d => isDuplicate(d.title, deal.title));
+              if (dupIndex !== -1) {
+                const pExisting = parsePriceVal(uniqueDeals[dupIndex].price);
+                const pNew = parsePriceVal(deal.price);
+                if (pNew < pExisting) {
+                  seenUrls.delete(uniqueDeals[dupIndex].url);
+                  uniqueDeals[dupIndex] = deal;
+                  seenUrls.add(cleanUrl);
+                }
+              } else {
+                uniqueDeals.push(deal);
+                if (cleanUrl) seenUrls.add(cleanUrl);
+              }
+            });
+
+            uniqueDeals.sort((a, b) => parsePriceVal(a.price) - parsePriceVal(b.price));
+
+            if (uniqueDeals.length > 0) {
+              let minPrice = Infinity;
+              let minIndex = -1;
+              uniqueDeals.forEach((d, idx) => {
+                const val = parsePriceVal(d.price);
+                if (val < minPrice && val > 0) {
+                  minPrice = val;
+                  minIndex = idx;
                 }
               });
+              if (minIndex !== -1) {
+                uniqueDeals[minIndex].isCheapest = true;
+              }
+            }
 
-              // 3. Basic duplicate cleanup for expanded search only
-              const uniqueDeals = [];
-              const seenUrls = new Set();
+            if (uniqueDeals.length > 0) {
+              resultsDiv.innerHTML = uniqueDeals.map(deal => {
+                const sColor = getSourceColor(deal.source);
+                const ratingStars = deal.rating ? \`⭐ \${deal.rating} (\${deal.reviewCount || 0})\` : "";
+                const scoreDisplay = deal.score ? \`<span class="score" style="color: #007b00; font-weight: bold; font-size: 0.9rem; margin-left: 8px;">Score: \${deal.score}</span>\` : "";
+                const priceDisplay = typeof deal.price === 'number' ? \`$\${deal.price.toFixed(2)}\` : deal.price;
+                const cheapestBadge = deal.isCheapest ? \`<span style="background-color: #057857; color: white; padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; font-weight: bold; margin-left: 8px;">🏆 Cheapest Found</span>\` : "";
 
-              const cleanTitle = t => (t || "").toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\\s+/).filter(Boolean);
-
-              const isDuplicate = (t1, t2) => {
-                const w1 = cleanTitle(t1);
-                const w2 = cleanTitle(t2);
-                if (w1.length === 0 || w2.length === 0) return false;
-                const common = w1.filter(w => w2.includes(w));
-                const similarity = common.length / Math.max(w1.length, w2.length);
-                return similarity > 0.75;
-              };
-
-              const parsePriceVal = p => {
-                if (typeof p === 'number') return p;
-                if (!p) return Infinity;
-                const cl = String(p).replace(/[^0-9.]/g, '');
-                return parseFloat(cl) || Infinity;
-              };
-
-              allDeals.forEach(deal => {
-                let cleanUrl = deal.url || "";
-                try {
-                  const u = new URL(cleanUrl);
-                  u.search = "";
-                  u.hash = "";
-                  cleanUrl = u.toString();
-                } catch (e) {}
-
-                if (seenUrls.has(cleanUrl)) return;
-
-                const dupIndex = uniqueDeals.findIndex(d => isDuplicate(d.title, deal.title));
-                if (dupIndex !== -1) {
-                  const pExisting = parsePriceVal(uniqueDeals[dupIndex].price);
-                  const pNew = parsePriceVal(deal.price);
-                  if (pNew < pExisting) {
-                    seenUrls.delete(uniqueDeals[dupIndex].url);
-                    uniqueDeals[dupIndex] = deal;
-                    seenUrls.add(cleanUrl);
-                  }
-                } else {
-                  uniqueDeals.push(deal);
-                  if (cleanUrl) seenUrls.add(cleanUrl);
-                }
-              });
-
-              // 4. Render results beautifully
-              if (uniqueDeals.length > 0) {
-                resultsDiv.innerHTML = uniqueDeals.map(deal => {
-                  const sColor = getSourceColor(deal.source);
-                  const ratingStars = deal.rating ? \`⭐ \${deal.rating} (\${deal.reviewCount || 0})\` : "";
-                  const scoreDisplay = deal.score ? \`<span class="score" style="color: #007b00; font-weight: bold; font-size: 0.9rem; margin-left: 8px;">Score: \${deal.score}</span>\` : "";
-                  const priceDisplay = typeof deal.price === 'number' ? \`$\${deal.price.toFixed(2)}\` : deal.price;
-
-                  return \`
-                    <div class="deal" style="background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 1.25rem; margin-top: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);">
-                      <div style="display: flex; gap: 1rem; align-items: start;">
-                        \${deal.image ? \`<img src="\${deal.image}" alt="\${deal.title}" style="width: 80px; height: 80px; object-fit: contain; border-radius: 6px; border: 1px solid #eee; background: #fff; padding: 4px;" />\` : ""}
-                        <div style="flex: 1;">
-                          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;">
-                            <span style="background-color: \${sColor}; color: white; padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">\${deal.source}</span>
-                            \${deal.shipping ? \`<span style="font-size: 0.75rem; color: #555; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">🚚 \${deal.shipping}</span>\` : ""}
-                            \${deal.availability ? \`<span style="font-size: 0.75rem; color: \${deal.availability.toLowerCase().includes('in stock') || deal.availability.toLowerCase().includes('open') ? '#047857' : '#b91c1c'}; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">\${deal.availability}</span>\` : ""}
-                          </div>
-                          <a href="\${deal.url}" target="_blank" style="text-decoration: none; color: #1e40af; font-size: 1.05rem; font-weight: 700; line-height: 1.4; display: block; margin-bottom: 6px;">\${deal.title}</a>
-                          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                            <span style="font-size: 1.25rem; font-weight: 800; color: #111827;">\${priceDisplay}</span>
-                            \${ratingStars}
-                            \${scoreDisplay}
-                          </div>
+                return \`
+                  <div class="deal" style="background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 1.25rem; margin-top: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);">
+                    <div style="display: flex; gap: 1rem; align-items: start;">
+                      \${deal.image ? \`<img src="\${deal.image}" alt="\${deal.title}" style="width: 80px; height: 80px; object-fit: contain; border-radius: 6px; border: 1px solid #eee; background: #fff; padding: 4px;" />\` : ""}
+                      <div style="flex: 1;">
+                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;">
+                          <span style="background-color: \${sColor}; color: white; padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">\${deal.source}</span>
+                          \${deal.shipping ? \`<span style="font-size: 0.75rem; color: #555; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">🚚 \${deal.shipping}</span>\` : ""}
+                          \${deal.availability ? \`<span style="font-size: 0.75rem; color: \${deal.availability.toLowerCase().includes('in stock') || deal.availability.toLowerCase().includes('open') ? '#047857' : '#b91c1c'}; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">\${deal.availability}</span>\` : ""}
+                          \${cheapestBadge}
+                        </div>
+                        <a href="\${deal.url}" target="_blank" style="text-decoration: none; color: #1e40af; font-size: 1.05rem; font-weight: 700; line-height: 1.4; display: block; margin-bottom: 6px;">\${deal.title}</a>
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                          <span style="font-size: 1.25rem; font-weight: 800; color: #111827;">\${priceDisplay}</span>
+                          \${ratingStars}
+                          \${scoreDisplay}
                         </div>
                       </div>
-                    </div>\`;
-                }).join("");
-              } else {
-                resultsDiv.innerHTML = "No deals found.";
-              }
-            } catch (err) {
-              console.error("❌ Expanded Search error:", err);
-              resultsDiv.innerHTML = "Something went wrong during expanded search.";
-            }
-          } else {
-            // STANDARD flow (remains 100% untouched)
-            resultsDiv.innerHTML = "🔎 Searching...";
-            try {
-              const payload = {
-                tool: "find_best_deals",
-                parameters: { query, userKey, site }
-              };
+                    </div>
+                  </div>\`;
+              }).join("");
 
-              console.log("📤 Sending request to MCP:", payload);
+              if ((site === "all" || site === "expanded") && aiSummarySection && aiSummaryContent) {
+                aiSummarySection.style.display = "block";
+                aiSummaryContent.innerHTML = "🤖 Generating AI deal summary and value analysis...";
+                
+                try {
+                  const aiResponse = await fetch("/api/ai-rank-deals", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query, deals: uniqueDeals })
+                  }).then(res => res.json());
 
-              const response = await fetch(MCP_ENDPOINT, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-              });
+                  if (aiResponse.enabled) {
+                    let avoidHtml = "";
+                    if (aiResponse.avoid && aiResponse.avoid.length > 0) {
+                      avoidHtml = \`
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #bbf7d0;">
+                          <strong style="color: #991b1b;">⚠️ Items to potentially avoid:</strong>
+                          <ul style="margin: 5px 0 0 20px; padding: 0; color: #7f1d1d;">
+                            \${aiResponse.avoid.map(item => \`<li><strong>\${item.title}</strong> (\${item.source}): \${item.reason}</li>\`).join("")}
+                          </ul>
+                        </div>\`;
+                    }
 
-              const data = await response.json();
-              console.log("✅ Response from MCP:", data);
-
-              if (data.deals?.length > 0) {
-                resultsDiv.innerHTML = data.deals.map(deal => {
-                  const urlStr = deal.url || "";
-                  let derivedSource = "Amazon";
-                  if (urlStr.includes("walmart.com")) {
-                    derivedSource = "Walmart";
-                  } else if (deal.tag && deal.tag.toLowerCase().includes("walmart")) {
-                    derivedSource = "Walmart";
+                    aiSummaryContent.innerHTML = \`
+                      <div style="margin-bottom: 12px;">
+                        \${aiResponse.summary}
+                      </div>
+                      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+                        \${aiResponse.bestDeal ? \`
+                          <div style="background: rgba(255,255,255,0.7); padding: 10px; border-radius: 8px; border: 1px solid #bbf7d0;">
+                            <strong style="color: #166534;">🌟 Best Value Deal:</strong><br/>
+                            <a href="\${aiResponse.bestDeal.url || '#'}" target="_blank" style="color: #15803d; font-weight: bold; text-decoration: none; font-size: 0.9rem;">\${aiResponse.bestDeal.title}</a><br/>
+                            <span style="font-weight: bold;">\${aiResponse.bestDeal.price}</span> from <strong>\${aiResponse.bestDeal.source}</strong><br/>
+                            <span style="font-size: 0.8rem; color: #3f6212;">\${aiResponse.bestDeal.reason}</span>
+                          </div>\` : ""}
+                        \${aiResponse.cheapestDeal ? \`
+                          <div style="background: rgba(255,255,255,0.7); padding: 10px; border-radius: 8px; border: 1px solid #bbf7d0;">
+                            <strong style="color: #166534;">💰 Cheapest Deal:</strong><br/>
+                            <a href="\${aiResponse.cheapestDeal.url || '#'}" target="_blank" style="color: #15803d; font-weight: bold; text-decoration: none; font-size: 0.9rem;">\${aiResponse.cheapestDeal.title}</a><br/>
+                            <span style="font-weight: bold;">\${aiResponse.cheapestDeal.price}</span> from <strong>\${aiResponse.cheapestDeal.source}</strong><br/>
+                            <span style="font-size: 0.8rem; color: #3f6212;">\${aiResponse.cheapestDeal.reason}</span>
+                          </div>\` : ""}
+                      </div>
+                      \${avoidHtml}
+                    \`;
+                  } else {
+                    aiSummaryContent.innerHTML = \`ℹ️ \${aiResponse.summary}\`;
                   }
-                  const sColor = getSourceColor(derivedSource);
-
-                  return \`
-                    <div class="deal" style="background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 1.25rem; margin-top: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);">
-                      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;">
-                        <span style="background-color: \${sColor}; color: white; padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; font-weight: bold; text-transform: uppercase;">\${derivedSource}</span>
-                      </div>
-                      <a href="\${deal.url}" target="_blank" style="text-decoration: none; color: #1e40af; font-size: 1.05rem; font-weight: 700;"><strong>\${deal.title}</strong></a><br />
-                      <div style="margin-top: 6px; display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 1.25rem; font-weight: 800; color: #111827;">\${deal.price}</span>
-                        \${deal.score ? \`<span class="score" style="color: #007b00; font-weight: bold;">Score: \${deal.score}</span>\` : ""}
-                        \${deal.tag ? \`<span class="tag" style="background-color: gold; color: black; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px;">\${deal.tag}</span>\` : ""}
-                      </div>
-                    </div>\`;
-                }).join("");
-              } else {
-                resultsDiv.innerHTML = "No deals found.";
+                } catch (aiErr) {
+                  console.error("❌ AI summarizer error:", aiErr);
+                  aiSummaryContent.innerHTML = "⚠️ Failed to generate AI summary.";
+                }
               }
-            } catch (err) {
-              console.error("❌ MCP error:", err);
-              resultsDiv.innerHTML = "Something went wrong.";
+            } else {
+              resultsDiv.innerHTML = "No deals found.";
             }
+          } catch (err) {
+            console.error("❌ Search execution error:", err);
+            resultsDiv.innerHTML = "Something went wrong during search.";
           }
         }
 
